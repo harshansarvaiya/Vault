@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#06090e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="AegisVault">
+  <title>AegisVault // Military-Grade Defense Core</title>
+  
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" type="image/svg+xml" href="/icons/icon-192.svg">
+  <link rel="apple-touch-icon" href="/icons/icon-192.svg">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+
+  <!-- Privacy Shield Overlay (Triggers on window blur or inactivity) -->
+  <div id="privacyShield">
+    <img src="/icons/icon-192.svg" alt="Aegis Defense" class="shield-logo">
+    <div class="shield-text">Security Protocol Active // Vault Obscured</div>
+    <div style="color: var(--text-muted); font-size: 12px; margin-top: 8px; font-family: var(--font-mono);">Click anywhere to resume verification</div>
+  </div>
+
+  <!-- Main Top Tactical Header -->
+  <header class="app-header">
+    <div class="brand-section">
+      <img src="/icons/icon-192.svg" alt="Aegis" class="brand-icon">
+      <div class="brand-title">AEGIS<span>VAULT</span></div>
+      <div id="statusBadge" class="status-badge">
+        <span class="status-dot"></span>
+        <span id="statusText">E2EE ACTIVE</span>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <!-- Unlocked Actions -->
+      <div id="unlockedHeaderActions" style="display: none; align-items: center; gap: 8px;">
+        <button id="btnMobileConnect" class="btn btn-icon" title="Mobile Phone Pair QR">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+        </button>
+        <button id="btnAudit" class="btn btn-icon" title="Security Health Audit">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+        </button>
+        <button id="btnOpenGenerator" class="btn btn-icon" title="Password Generator">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+        </button>
+        <button id="btnNewItem" class="btn btn-primary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          <span class="btn-text">New Item</span>
+        </button>
+        <button id="btnLockVault" class="btn btn-danger btn-icon" title="Lock Vault">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main View Container -->
+  <main class="app-container">
+
+    <!-- ======================================================== -->
+    <!-- AUTHENTICATION SCREEN (Locked / Not Logged In)          -->
+    <!-- ======================================================== -->
+    <section id="authSection" class="auth-container" style="display: flex; width: 100%;">
+      <div class="auth-card">
+        <div class="auth-header">
+          <img src="/icons/icon-192.svg" alt="Aegis" style="width: 56px; height: 56px; filter: drop-shadow(0 0 14px var(--cyan-core));">
+          <h2 style="font-family: var(--font-mono); font-size: 20px; color: #fff; letter-spacing: 1px;">AEGIS DEFENSE ACCESS</h2>
+          <p style="font-size: 13px; color: var(--text-secondary);">Zero-Knowledge Military Authentication</p>
+        </div>
+
+        <!-- Futuristic Biometric Passkey Hero Button -->
+        <button id="btnPasskeyLogin" class="passkey-hero-btn">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2h-1V7a5 5 0 0 0-5-5zm-3 8V7a3 3 0 0 1 6 0v3H9z"></path></svg>
+          <span>Unlock with Passkey / Biometrics</span>
+        </button>
+
+        <div class="auth-divider">OR AUTHENTICATE WITH MASTER KEY</div>
+
+        <!-- Login Form -->
+        <form id="loginForm" style="display: flex; flex-direction: column; gap: 14px;">
+          <div class="form-group">
+            <label class="form-label" for="loginUsername">Operator Identifier</label>
+            <input type="text" id="loginUsername" class="form-input" placeholder="e.g. commander" autocomplete="username" required>
+          </div>
+
+          <div class="form-group">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <label class="form-label" for="loginPassword">Master Password / Duress PIN</label>
+              <span style="font-size: 10px; color: var(--text-muted); font-family: var(--font-mono);">COERCION RESISTANT</span>
+            </div>
+            <input type="password" id="loginPassword" class="form-input" placeholder="••••••••••••••••" autocomplete="current-password" required>
+          </div>
+
+          <button type="submit" class="btn btn-primary" style="margin-top: 8px; height: 44px;">
+            Decrypt & Open Vault
+          </button>
+        </form>
+
+        <div style="text-align: center; margin-top: 4px;">
+          <button id="btnShowRegister" class="btn" style="background: transparent; border: none; color: var(--cyan-core); font-size: 13px;">
+            Initialize New Security Vault &rarr;
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================================================== -->
+    <!-- UNLOCKED VAULT MAIN VIEW                                -->
+    <!-- ======================================================== -->
+    <section id="vaultSection" style="display: none; width: 100%; gap: 20px;">
+      
+      <!-- Desktop Sidebar -->
+      <aside class="app-sidebar">
+        <div>
+          <div class="nav-group-title">Tactical Filters</div>
+          <div class="nav-item active" data-filter="all">
+            <div class="nav-item-left">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+              <span>All Credentials</span>
+            </div>
+            <span class="nav-count" id="countAll">0</span>
+          </div>
+          <div class="nav-item" data-filter="favorite">
+            <div class="nav-item-left">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+              <span>Priority / Favorites</span>
+            </div>
+            <span class="nav-count" id="countFavorites">0</span>
+          </div>
+          <div class="nav-item" data-filter="totp">
+            <div class="nav-item-left">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              <span>2FA Authenticator</span>
+            </div>
+            <span class="nav-count" id="countTotp">0</span>
+          </div>
+        </div>
+
+        <div>
+          <div class="nav-group-title">Categories</div>
+          <div class="nav-item" data-category="General"><span>General</span><span class="nav-count" id="countCatGeneral">0</span></div>
+          <div class="nav-item" data-category="Finance"><span>Finance & Crypto</span><span class="nav-count" id="countCatFinance">0</span></div>
+          <div class="nav-item" data-category="Infrastructure"><span>Servers & Cloud</span><span class="nav-count" id="countCatInfra">0</span></div>
+          <div class="nav-item" data-category="Work"><span>Work & Identity</span><span class="nav-count" id="countCatWork">0</span></div>
+        </div>
+
+        <div>
+          <div class="nav-group-title">Defense Tools</div>
+          <div class="nav-item" id="navPasskeysManager">
+            <div class="nav-item-left">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+              <span>Passkey Devices</span>
+            </div>
+          </div>
+          <div class="nav-item" id="navExportBackup">
+            <div class="nav-item-left">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              <span>Encrypted Backup</span>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Main Vault Content -->
+      <div class="app-content">
+        <!-- Search Toolbar -->
+        <div class="toolbar">
+          <div class="search-box">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <input type="text" id="searchInput" class="search-input" placeholder="Instant encrypted search (Title, User, Notes, Tags)...">
+          </div>
+        </div>
+
+        <!-- Category Horizontal Pills -->
+        <div class="category-pills">
+          <button class="pill active" data-pill="all">ALL</button>
+          <button class="pill" data-pill="General">GENERAL</button>
+          <button class="pill" data-pill="Finance">FINANCE</button>
+          <button class="pill" data-pill="Infrastructure">SERVERS</button>
+          <button class="pill" data-pill="Work">WORK</button>
+          <button class="pill" data-pill="favorites">★ FAVORITES</button>
+        </div>
+
+        <!-- Vault Cards Grid -->
+        <div id="vaultGrid" class="vault-grid">
+          <!-- Dynamically populated -->
+        </div>
+
+        <!-- Empty State Message -->
+        <div id="emptyVault" style="display: none; text-align: center; padding: 60px 20px; flex-direction: column; align-items: center; gap: 16px;">
+          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--border-bright)" stroke-width="1.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+          <h3 style="font-family: var(--font-mono); color: var(--text-secondary);">VAULT SECTOR EMPTY</h3>
+          <p style="color: var(--text-muted); font-size: 13px; max-width: 360px;">No credentials stored in this sector. Add your first encrypted entity using the button below.</p>
+          <button id="btnEmptyNew" class="btn btn-primary">+ Create New Credential</button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ======================================================== -->
+  <!-- MOBILE BOTTOM NAVIGATION (Visible on Smartphones)        -->
+  <!-- ======================================================== -->
+  <nav id="mobileNav" class="mobile-nav">
+    <button class="mobile-nav-item active" id="mobNavVault">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+      <span>Vault</span>
+    </button>
+    <button class="mobile-nav-item" id="mobNavGen">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+      <span>Generate</span>
+    </button>
+    <button class="mobile-nav-item" id="mobNavAdd" style="color: var(--cyan-core);">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+      <span>Add</span>
+    </button>
+    <button class="mobile-nav-item" id="mobNavAudit">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+      <span>Audit</span>
+    </button>
+    <button class="mobile-nav-item" id="mobNavDevices">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+      <span>Devices</span>
+    </button>
+  </nav>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: ADD / EDIT CREDENTIAL ITEM                        -->
+  <!-- ======================================================== -->
+  <div id="itemModal" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--cyan-core)" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+          <span id="itemModalTitle">STORE ENCRYPTED ENTITY</span>
+        </div>
+        <button class="btn btn-icon close-modal" style="border: none; background: transparent;">&times;</button>
+      </div>
+
+      <form id="itemForm">
+        <div class="modal-body">
+          <input type="hidden" id="itemId">
+
+          <div class="form-group">
+            <label class="form-label" for="itemTitle">App / Service / Entity Name *</label>
+            <input type="text" id="itemTitle" class="form-input" placeholder="e.g. AWS Production / Citibank / ProtonMail" required>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label class="form-label" for="itemCategory">Category</label>
+              <select id="itemCategory" class="form-select">
+                <option value="General">General</option>
+                <option value="Finance">Finance & Banking</option>
+                <option value="Infrastructure">Servers & Cloud</option>
+                <option value="Work">Work & Business</option>
+                <option value="Personal">Personal</option>
+              </select>
+            </div>
+
+            <div class="form-group" style="justify-content: flex-end; padding-bottom: 8px;">
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; color: var(--text-primary); font-family: var(--font-mono);">
+                <input type="checkbox" id="itemFavorite" style="accent-color: var(--cyan-core); width: 18px; height: 18px;">
+                <span>Mark Priority (★)</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="itemUsername">Username / ID / Email</label>
+            <input type="text" id="itemUsername" class="form-input" placeholder="admin@domain.com or root">
+          </div>
+
+          <div class="form-group">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <label class="form-label" for="itemPassword">Password / Secret Key *</label>
+              <button type="button" id="btnQuickGenPass" style="background: none; border: none; color: var(--cyan-core); font-size: 11px; font-family: var(--font-mono); cursor: pointer;">
+                ⚡ Generate Strong
+              </button>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <input type="text" id="itemPassword" class="form-input" style="flex: 1; font-family: var(--font-mono);" placeholder="Secret password" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="itemUrl">Website / Application URL</label>
+            <input type="url" id="itemUrl" class="form-input" placeholder="https://app.service.com">
+          </div>
+
+          <div class="form-group">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <label class="form-label" for="itemTotpSecret">2FA / TOTP Authenticator Key</label>
+              <span style="font-size: 10px; color: var(--cyan-core); font-family: var(--font-mono);">RFC 6238 COMPLIANT</span>
+            </div>
+            <input type="text" id="itemTotpSecret" class="form-input" style="font-family: var(--font-mono); text-transform: uppercase;" placeholder="Base32 Key (e.g. JBSWY3DPEHPK3PXP)">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="itemNotes">Classified Notes / Recovery Keys</label>
+            <textarea id="itemNotes" class="form-textarea" placeholder="API keys, backup codes, security questions..."></textarea>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="itemTags">Tags (Comma-separated)</label>
+            <input type="text" id="itemTags" class="form-input" placeholder="prod, vpn, critical, 2fa">
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn close-modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Encrypt & Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: REGISTRATION WIZARD & EMERGENCY KIT              -->
+  <!-- ======================================================== -->
+  <div id="registerModal" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">INITIALIZE SECURITY VAULT</div>
+        <button class="btn btn-icon close-modal" style="border: none; background: transparent;">&times;</button>
+      </div>
+
+      <form id="registerForm">
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label" for="regUsername">Operator Identifier (Username)</label>
+            <input type="text" id="regUsername" class="form-input" placeholder="commander" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="regPassword">Master Password (600,000 PBKDF2 Rounds)</label>
+            <input type="password" id="regPassword" class="form-input" placeholder="••••••••••••••••" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="regPasswordConfirm">Confirm Master Password</label>
+            <input type="password" id="regPasswordConfirm" class="form-input" placeholder="••••••••••••••••" required>
+          </div>
+
+          <div style="background: rgba(255, 0, 68, 0.05); border: 1px dashed rgba(255, 0, 68, 0.4); border-radius: var(--radius-sm); padding: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <span style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--red-alert);">DURESS COERCION DEFENSE PIN (OPTION A)</span>
+              <span style="font-size: 10px; color: var(--text-muted); font-family: var(--font-mono);">STEALTH DECOY</span>
+            </div>
+            <p style="font-size: 11px; color: var(--text-secondary); margin-bottom: 8px;">
+              If coerced under duress, enter this PIN instead of your Master Password. The app seamlessly unlocks an authentic decoy vault with dummy accounts, protecting your real credentials.
+            </p>
+            <input type="password" id="regDuressPin" class="form-input" placeholder="Optional Duress PIN (e.g. 9988)" style="border-color: rgba(255, 0, 68, 0.3);">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Emergency Recovery Mnemonic (Save this securely!)</label>
+            <div id="recoveryPhraseBox" style="background: var(--bg-surface); border: 1px solid var(--border-bright); padding: 12px; border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 12px; color: var(--cyan-core); line-height: 1.6; user-select: all;">
+              <!-- Generated automatically -->
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn close-modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Initialize & Encrypt Vault</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: PASSWORD & PASSPHRASE GENERATOR                   -->
+  <!-- ======================================================== -->
+  <div id="genModal" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--cyan-core)" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+          <span>ENTROPY PASSWORD GENERATOR</span>
+        </div>
+        <button class="btn btn-icon close-modal" style="border: none; background: transparent;">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Display Field -->
+        <div style="display: flex; gap: 8px;">
+          <input type="text" id="genResult" readonly class="form-input" style="font-family: var(--font-mono); font-size: 16px; font-weight: 700; color: var(--cyan-core); flex: 1; letter-spacing: 1px;">
+          <button id="btnCopyGen" class="btn btn-primary" title="Copy to Clipboard">Copy</button>
+          <button id="btnRerollGen" class="btn" title="Reroll Entropy">↻</button>
+        </div>
+
+        <!-- Live Entropy Stats -->
+        <div class="entropy-hud">
+          <div class="entropy-stats">
+            <span id="genEntropyBits">Entropy: 0 bits</span>
+            <span id="genCrackTime" style="color: var(--cyan-core);">Crack Time: Instant</span>
+          </div>
+          <div class="entropy-meter-bar">
+            <div id="genEntropyBar" class="entropy-fill"></div>
+          </div>
+        </div>
+
+        <!-- Length Slider -->
+        <div class="form-group">
+          <div style="display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 12px;">
+            <span>Password Length</span>
+            <span id="genLengthVal">24</span>
+          </div>
+          <input type="range" id="genLength" min="8" max="128" value="24" style="accent-color: var(--cyan-core); cursor: pointer;">
+        </div>
+
+        <!-- Options -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-family: var(--font-mono); font-size: 12px;">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+            <input type="checkbox" id="genUpper" checked style="accent-color: var(--cyan-core);">
+            <span>Uppercase (A-Z)</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+            <input type="checkbox" id="genLower" checked style="accent-color: var(--cyan-core);">
+            <span>Lowercase (a-z)</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+            <input type="checkbox" id="genNumbers" checked style="accent-color: var(--cyan-core);">
+            <span>Numbers (0-9)</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+            <input type="checkbox" id="genSymbols" checked style="accent-color: var(--cyan-core);">
+            <span>Symbols (!@#$%)</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+            <input type="checkbox" id="genAvoidAmbiguous" style="accent-color: var(--cyan-core);">
+            <span>Avoid Ambiguous</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+            <input type="checkbox" id="genDiceware" style="accent-color: var(--cyan-core);">
+            <span>Diceware Passphrase</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn close-modal">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: SECURITY HEALTH AUDITOR                           -->
+  <!-- ======================================================== -->
+  <div id="auditModal" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--cyan-core)" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+          <span>VAULT SECURITY AUDIT</span>
+        </div>
+        <button class="btn btn-icon close-modal" style="border: none; background: transparent;">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
+          <div style="background: var(--bg-surface); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-dim);">
+            <div style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">TOTAL ANALYZED</div>
+            <div id="auditTotal" style="font-size: 24px; font-weight: 700; color: #fff; font-family: var(--font-mono);">0</div>
+          </div>
+          <div style="background: var(--bg-surface); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-dim);">
+            <div style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">WEAK PASSWORDS</div>
+            <div id="auditWeak" style="font-size: 24px; font-weight: 700; color: var(--red-alert); font-family: var(--font-mono);">0</div>
+          </div>
+          <div style="background: var(--bg-surface); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-dim);">
+            <div style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">REUSED PASSWORDS</div>
+            <div id="auditReused" style="font-size: 24px; font-weight: 700; color: var(--amber-warn); font-family: var(--font-mono);">0</div>
+          </div>
+          <div style="background: var(--bg-surface); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-dim);">
+            <div style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">WITHOUT 2FA / TOTP</div>
+            <div id="auditNo2fa" style="font-size: 24px; font-weight: 700; color: var(--cyan-core); font-family: var(--font-mono);">0</div>
+          </div>
+        </div>
+
+        <div id="auditFindings" style="display: flex; flex-direction: column; gap: 8px; max-height: 250px; overflow-y: auto;">
+          <!-- Items with warnings -->
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn close-modal">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: PASSKEY & BIOMETRIC DEVICES MANAGER               -->
+  <!-- ======================================================== -->
+  <div id="passkeysModal" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--cyan-core)" stroke-width="2"><path d="M12 2a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2h-1V7a5 5 0 0 0-5-5zm-3 8V7a3 3 0 0 1 6 0v3H9z"></path></svg>
+          <span>PASSKEYS & BIOMETRIC DEVICES</span>
+        </div>
+        <button class="btn btn-icon close-modal" style="border: none; background: transparent;">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <p style="font-size: 13px; color: var(--text-secondary);">
+          Register this device (Face ID, Touch ID, Windows Hello, or YubiKey FIDO2 token) to unlock your vault in 1 touch without typing your master password.
+        </p>
+
+        <div style="display: flex; gap: 8px;">
+          <input type="text" id="passkeyDeviceName" class="form-input" placeholder="Device Label (e.g. iPhone 15 Pro / Work PC)" style="flex: 1;">
+          <button id="btnRegisterNewPasskey" class="btn btn-primary">+ Add Passkey</button>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Registered Authenticators</label>
+          <div id="passkeysList" style="display: flex; flex-direction: column; gap: 8px;">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn close-modal">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: MOBILE SMARTPHONE CONNECTION (QR CODE)            -->
+  <!-- ======================================================== -->
+  <div id="mobilePairModal" class="modal-backdrop">
+    <div class="modal-card" style="text-align: center;">
+      <div class="modal-header">
+        <div class="modal-title">CONNECT SMARTPHONE</div>
+        <button class="btn btn-icon close-modal" style="border: none; background: transparent;">&times;</button>
+      </div>
+
+      <div class="modal-body" style="align-items: center;">
+        <p style="font-size: 13px; color: var(--text-secondary); max-width: 360px;">
+          Scan this QR code with your mobile phone camera (connected to the same Wi-Fi) or open the address below in iOS Safari / Android Chrome.
+        </p>
+
+        <div id="qrCodeContainer" style="background: #fff; padding: 16px; border-radius: var(--radius-md); display: inline-block; margin: 8px auto;">
+          <!-- SVG QR Code -->
+        </div>
+
+        <div id="mobileUrlDisplay" style="font-family: var(--font-mono); font-size: 14px; color: var(--cyan-core); word-break: break-all; background: var(--bg-surface); padding: 10px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-bright);">
+          https://...
+        </div>
+
+        <div style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); max-width: 380px;">
+          Note: Since this uses a self-signed TLS certificate for local network encryption, your mobile browser may show a one-time "Proceed to site (unsafe)" warning. Tap Advanced &gt; Proceed.
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn close-modal">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toastContainer"></div>
+
+  <!-- Scripts -->
+  <script type="module" src="/js/crypto.js"></script>
+  <script type="module" src="/js/totp.js"></script>
+  <script type="module" src="/js/password-generator.js"></script>
+  <script type="module" src="/js/webauthn-client.js"></script>
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>

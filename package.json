@@ -1,0 +1,24 @@
+{
+  "name": "aegis-vault",
+  "version": "1.0.0",
+  "description": "Military-grade, zero-knowledge, end-to-end encrypted password and identity manager with WebAuthn Passkeys and mobile PWA support",
+  "type": "module",
+  "main": "server/server.mjs",
+  "scripts": {
+    "start": "node server/server.mjs",
+    "test": "node tests/crypto_and_api_test.mjs"
+  },
+  "keywords": [
+    "security",
+    "vault",
+    "password-manager",
+    "zero-knowledge",
+    "e2ee",
+    "aes-256-gcm",
+    "webauthn",
+    "passkeys",
+    "pwa"
+  ],
+  "author": "Aegis Security Systems",
+  "license": "MIT"
+}

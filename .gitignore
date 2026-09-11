@@ -1,0 +1,29 @@
+# AegisVault Git Ignore Rules
+
+# Runtime database & cryptographic keys (Zero-Knowledge Rule: NEVER COMMIT KEYS OR DB)
+data/
+*.db
+*.db-wal
+*.db-shm
+*.key
+*.cert
+*.pfx
+*.pem
+
+# Dependencies & Logs
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# IDE & OS Files
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+Thumbs.db
