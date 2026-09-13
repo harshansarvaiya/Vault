@@ -245,6 +245,75 @@ async function runTests() {
     }
   });
 
+  // TEST 9: Encrypted .vault Backup Export & Emergency Decryptor
+  await test('Encrypted .vault Backup Export & Disaster Recovery Decryption', async () => {
+    const masterPassword = 'MyUltraSecureVaultPass2026!';
+    const kdfSalt = getRandomHex(16);
+    const authSalt = getRandomHex(16);
+    const iterations = 10000; // fast iterations for test
+
+    const { mek, authHash } = await deriveMasterKeys(masterPassword, kdfSalt, iterations);
+    const { key: vek } = await generateVek();
+    const encryptedVek = await encryptVek(vek, mek);
+
+    // Encrypt sensitive user credentials
+    const credentials = [
+      { id: '1', title: 'Google Mail', username: 'alex@gmail.com', password: 'SuperSecretGooglePassword!1', url: 'https://gmail.com', notes: 'Personal primary' },
+      { id: '2', title: 'Bank Account', username: 'alex_bank', password: 'BankingPassword#7788', url: 'https://bank.com', notes: 'Checking acct' },
+    ];
+
+    const encryptedItems = [];
+    for (const cred of credentials) {
+      const encryptedPayload = await encryptPayload(cred, vek);
+      encryptedItems.push({ id: cred.id, encrypted_payload: encryptedPayload });
+    }
+
+    // Package into .vault format
+    const vaultBackup = {
+      format: 'aegis-encrypted-vault',
+      version: '1.0',
+      username: 'alex',
+      kdfSalt,
+      kdfIterations: iterations,
+      authSalt,
+      authHash,
+      encryptedVek,
+      items: encryptedItems,
+      exportedAt: new Date().toISOString(),
+    };
+
+    // Serialize to JSON file string (simulating .vault file on disk or email attachment)
+    const vaultFileContent = JSON.stringify(vaultBackup);
+    const parsedFile = JSON.parse(vaultFileContent);
+
+    // 1. Attempt decryption with WRONG password -> must throw authentication error
+    let wrongPassThrew = false;
+    try {
+      const wrongKeys = await deriveMasterKeys('WrongPassword!', parsedFile.kdfSalt, parsedFile.kdfIterations);
+      await decryptVek(parsedFile.encryptedVek, wrongKeys.mek);
+    } catch {
+      wrongPassThrew = true;
+    }
+    assert.strictEqual(wrongPassThrew, true, 'Decryption with wrong password MUST fail AEAD tag check');
+
+    // 2. Attempt decryption with CORRECT password -> must succeed and recover exact data
+    const recoveredKeys = await deriveMasterKeys(masterPassword, parsedFile.kdfSalt, parsedFile.kdfIterations);
+    assert.strictEqual(recoveredKeys.authHash, parsedFile.authHash, 'Derived authHash must match vault file');
+
+    const recoveredVek = await decryptVek(parsedFile.encryptedVek, recoveredKeys.mek);
+    const recoveredItems = [];
+    for (const item of parsedFile.items) {
+      const decrypted = await decryptPayload(item.encrypted_payload, recoveredVek);
+      recoveredItems.push(decrypted);
+    }
+
+    assert.strictEqual(recoveredItems.length, 2, 'Must recover exactly 2 credentials');
+    assert.strictEqual(recoveredItems[0].title, 'Google Mail');
+    assert.strictEqual(recoveredItems[0].password, 'SuperSecretGooglePassword!1');
+    assert.strictEqual(recoveredItems[1].title, 'Bank Account');
+    assert.strictEqual(recoveredItems[1].password, 'BankingPassword#7788');
+  });
+
   console.log('\n================================================================');
   console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED`);
   console.log('================================================================\n');

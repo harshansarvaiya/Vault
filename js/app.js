@@ -223,6 +223,16 @@ async function handleLogin(username, password) {
     state.sessionToken = authData.sessionToken;
     state.mek = mek;
 
+    // Cache user credentials and salts in localStore for offline & backup usage
+    localStore.saveUser({
+      username: authData.user.username,
+      authSalt: salts ? salts.authSalt : null,
+      authHash: authHash,
+      kdfSalt: salts ? salts.kdfSalt : null,
+      kdfIterations: salts ? (salts.kdfIterations || 600000) : 600000,
+      encryptedVek: authData.encryptedVek,
+    });
+
     // 4. Decrypt VEK
     state.vek = await decryptVek(authData.encryptedVek, mek);
 
@@ -379,6 +389,8 @@ async function loadVaultItems() {
 
     if (!encryptedItems) {
       encryptedItems = localStore.getItems(state.currentUser.username);
+    } else if (Array.isArray(encryptedItems)) {
+      localStore.saveItems(state.currentUser.username, encryptedItems);
     }
 
     const decryptedItems = [];
@@ -653,28 +665,31 @@ function populateItemModal(item = null) {
 // BACKUP, EXPORT & THEFT RECOVERY
 // =========================================================================
 
-function exportEncryptedBackup() {
-  if (state.vaultItems.length === 0) {
-    showToast('No credentials to export', 'info');
-    return;
-  }
-
-  // Get raw encrypted items
+function buildBackupPackage() {
+  if (!state.currentUser) return null;
   const encryptedItems = localStore.getItems(state.currentUser.username);
   const user = localStore.getUser(state.currentUser.username);
 
-  const backupPackage = {
+  return {
     format: 'aegis-encrypted-vault',
     version: '1.0',
     username: state.currentUser.username,
     kdfSalt: user ? user.kdfSalt : null,
-    kdfIterations: user ? user.kdfIterations : 600000,
+    kdfIterations: user ? (user.kdfIterations || 600000) : 600000,
     authSalt: user ? user.authSalt : null,
     authHash: user ? user.authHash : null,
     encryptedVek: user ? user.encryptedVek : null,
-    items: encryptedItems,
+    items: encryptedItems || [],
     exportedAt: new Date().toISOString(),
   };
+}
+
+function exportEncryptedBackup() {
+  const backupPackage = buildBackupPackage();
+  if (!backupPackage) {
+    showToast('Vault must be unlocked to export', 'error');
+    return;
+  }
 
   const blob = new Blob([JSON.stringify(backupPackage, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -684,6 +699,51 @@ function exportEncryptedBackup() {
   a.click();
   URL.revokeObjectURL(url);
   showToast('Encrypted backup downloaded.', 'success');
+}
+
+async function emailEncryptedBackup() {
+  const backupPackage = buildBackupPackage();
+  if (!backupPackage) {
+    showToast('Vault must be unlocked to email backup', 'error');
+    return;
+  }
+
+  const filename = `AegisVault_Backup_${state.currentUser.username}_${Date.now()}.vault`;
+  const jsonStr = JSON.stringify(backupPackage, null, 2);
+  const blob = new Blob([jsonStr], { type: 'application/json' });
+  const file = new File([blob], filename, { type: 'application/json' });
+
+  // 1. Mobile & Web Share API support: share directly via Mail / Gmail app
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({
+        title: `Vault Encrypted Backup - ${state.currentUser.username}`,
+        text: `Encrypted Aegis Vault Backup (${filename}). Protected with zero-knowledge AES-256-GCM. Decrypt using your Master Password.`,
+        files: [file],
+      });
+      showToast('Backup shared successfully!', 'success');
+      return;
+    } catch (err) {
+      if (err.name === 'AbortError') return; // User closed share dialog
+      console.warn('Native file share failed, falling back to download + mailto:', err);
+    }
+  }
+
+  // 2. Desktop fallback: Trigger direct file download and open mailto draft
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+
+  const subject = encodeURIComponent(`Aegis Vault Encrypted Backup - ${state.currentUser.username}`);
+  const body = encodeURIComponent(
+    `Hello,\n\nYour encrypted Aegis Vault backup file ("${filename}") has been saved to your downloads.\n\nPlease attach that .vault file to this email to safely keep a copy in your inbox for disaster recovery.\n\nSECURITY NOTE:\nThis file is encrypted with zero-knowledge military-grade AES-256-GCM. No one (not even email providers or attackers) can open it without your Master Password.\n\nTo restore on any phone or computer, open Aegis Vault and use the Emergency .vault Decryptor.`
+  );
+
+  window.location.href = `mailto:?subject=${subject}&body=${body}`;
+  showToast('Backup file downloaded & email draft opened.', 'success', 5000);
 }
 
 function importBackupFile(file) {
@@ -717,6 +777,269 @@ function importBackupFile(file) {
     }
   };
   reader.readAsText(file);
+}
+
+// =========================================================================
+// EMERGENCY .VAULT DECRYPTOR (Disaster & Theft Recovery)
+// =========================================================================
+
+let emergencyState = {
+  data: null,
+  decryptedItems: [],
+  mek: null,
+  vek: null,
+  searchQuery: '',
+};
+
+function openEmergencyDecryptModal() {
+  emergencyState = {
+    data: null,
+    decryptedItems: [],
+    mek: null,
+    vek: null,
+    searchQuery: '',
+  };
+
+  const fileInput = document.getElementById('emergencyVaultFileInput');
+  if (fileInput) fileInput.value = '';
+  const passInput = document.getElementById('emergencyMasterPassword');
+  if (passInput) passInput.value = '';
+  const searchInput = document.getElementById('emergencySearchInput');
+  if (searchInput) searchInput.value = '';
+
+  const inputSec = document.getElementById('emergencyInputSection');
+  const outputSec = document.getElementById('emergencyOutputSection');
+  if (inputSec) inputSec.style.display = 'flex';
+  if (outputSec) outputSec.style.display = 'none';
+
+  openModal('emergencyDecryptModal');
+}
+
+async function runEmergencyDecrypt() {
+  const fileInput = document.getElementById('emergencyVaultFileInput');
+  const passInput = document.getElementById('emergencyMasterPassword');
+
+  if (!fileInput.files || !fileInput.files[0]) {
+    showToast('Please select your .vault backup file first', 'error');
+    return;
+  }
+
+  const password = passInput.value;
+  if (!password) {
+    showToast('Please enter your Master Password', 'error');
+    return;
+  }
+
+  const file = fileInput.files[0];
+
+  try {
+    showToast('Deriving keys & verifying Master Password (600,000 rounds)...', 'info', 2500);
+
+    const fileText = await file.text();
+    let data;
+    try {
+      data = JSON.parse(fileText);
+    } catch {
+      throw new Error('Corrupted file: Not valid JSON');
+    }
+
+    if (data.format !== 'aegis-encrypted-vault' || !data.encryptedVek || !data.kdfSalt) {
+      throw new Error('Unrecognized backup format. Expected Aegis .vault file.');
+    }
+
+    // Derive Master Keys using the salt & iterations embedded in the backup
+    const { mek, authHash } = await deriveMasterKeys(
+      password,
+      data.kdfSalt,
+      data.kdfIterations || 600000
+    );
+
+    // If backup recorded authHash, verify it
+    if (data.authHash && data.authHash !== authHash) {
+      throw new Error('Incorrect Master Password. Verification failed.');
+    }
+
+    // Decrypt Vault Encryption Key (VEK) - AES-GCM tag verification
+    let vek;
+    try {
+      vek = await decryptVek(data.encryptedVek, mek);
+    } catch {
+      throw new Error('Incorrect Master Password or authentication tag failed.');
+    }
+
+    // Decrypt all items
+    const decryptedItems = [];
+    const itemsToDecrypt = data.items || [];
+    for (const item of itemsToDecrypt) {
+      try {
+        const payload = await decryptPayload(item.encrypted_payload, vek);
+        decryptedItems.push({
+          id: item.id || `item_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          title: payload.title || 'Untitled',
+          username: payload.username || '',
+          password: payload.password || '',
+          url: payload.url || '',
+          notes: payload.notes || '',
+          created_at: item.created_at,
+          updated_at: item.updated_at,
+        });
+      } catch (e) {
+        console.warn('Decryption failed on item:', item.id, e);
+      }
+    }
+
+    emergencyState.data = data;
+    emergencyState.decryptedItems = decryptedItems;
+    emergencyState.mek = mek;
+    emergencyState.vek = vek;
+    emergencyState.searchQuery = '';
+
+    // Switch view to results
+    document.getElementById('emergencyInputSection').style.display = 'none';
+    const outputSec = document.getElementById('emergencyOutputSection');
+    outputSec.style.display = 'flex';
+
+    document.getElementById('emergencyDecryptedTitle').innerText =
+      `✓ Decrypted ${decryptedItems.length} accounts for [${data.username || 'user'}]`;
+
+    renderEmergencyItems();
+    showToast(`Emergency decryption successful! (${decryptedItems.length} accounts found)`, 'success', 4000);
+  } catch (err) {
+    showToast(err.message, 'error', 4000);
+  }
+}
+
+function renderEmergencyItems() {
+  const listEl = document.getElementById('emergencyResultsList');
+  if (!listEl) return;
+
+  let items = emergencyState.decryptedItems;
+  const q = emergencyState.searchQuery.trim().toLowerCase();
+  if (q) {
+    items = items.filter(
+      (i) =>
+        i.title.toLowerCase().includes(q) ||
+        i.username.toLowerCase().includes(q) ||
+        i.url.toLowerCase().includes(q) ||
+        i.notes.toLowerCase().includes(q)
+    );
+  }
+
+  if (items.length === 0) {
+    listEl.innerHTML = `
+      <div style="text-align: center; padding: 24px; color: var(--text-muted); font-size: 13px; font-family: var(--font-mono);">
+        ${q ? 'No accounts matched your search.' : 'This vault contains no accounts.'}
+      </div>
+    `;
+    return;
+  }
+
+  listEl.innerHTML = items
+    .map((item) => {
+      const initial = (item.title || 'U').charAt(0).toUpperCase();
+
+      return `
+        <div class="emergency-card" style="background: var(--bg-surface); border: 1px solid var(--border-bright); border-radius: var(--radius-sm); padding: 12px; display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-weight: 700; font-size: 14px; color: #fff; display: flex; align-items: center; gap: 8px;">
+              <span style="display: inline-block; width: 26px; height: 26px; line-height: 26px; text-align: center; background: var(--bg-primary); border-radius: 4px; font-family: var(--font-mono); font-size: 12px; color: var(--cyan-core); border: 1px solid var(--border-dim);">${initial}</span>
+              <span>${escapeHtml(item.title)}</span>
+            </div>
+            ${item.url ? `
+              <a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer" style="font-size: 11px; color: var(--cyan-core); text-decoration: none; font-family: var(--font-mono); display: flex; align-items: center; gap: 3px;">
+                <span>Visit &rarr;</span>
+              </a>
+            ` : ''}
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-primary); border: 1px solid var(--border-dim); border-radius: 4px; padding: 6px 10px; font-family: var(--font-mono); font-size: 12px;">
+            <span style="color: var(--text-muted); font-size: 10px; text-transform: uppercase;">User / ID</span>
+            <span style="color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px;">${escapeHtml(item.username)}</span>
+            <button class="icon-action-btn btn-emg-copy" data-copy="${escapeHtml(item.username)}" data-label="Username" title="Copy Username">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            </button>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-primary); border: 1px solid var(--border-dim); border-radius: 4px; padding: 6px 10px; font-family: var(--font-mono); font-size: 12px;">
+            <span style="color: var(--text-muted); font-size: 10px; text-transform: uppercase;">Password</span>
+            <span class="emg-pass-text" data-revealed="false" data-pass="${escapeHtml(item.password)}" style="color: var(--cyan-core); font-family: var(--font-mono);">••••••••••••</span>
+            <div style="display: flex; gap: 4px;">
+              <button class="icon-action-btn btn-emg-toggle-pass" title="Reveal Password">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+              </button>
+              <button class="icon-action-btn btn-emg-copy" data-copy="${escapeHtml(item.password)}" data-label="Password" title="Copy Password (Auto-clear 30s)">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+              </button>
+            </div>
+          </div>
+
+          ${item.notes ? `
+            <div style="font-size: 11px; color: var(--text-secondary); background: var(--bg-primary); border-radius: 4px; padding: 6px 8px; border-left: 2px solid var(--border-bright); font-family: var(--font-mono); white-space: pre-wrap;">${escapeHtml(item.notes)}</div>
+          ` : ''}
+        </div>
+      `;
+    })
+    .join('');
+
+  listEl.querySelectorAll('.btn-emg-copy').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      copyWithAutoClear(btn.getAttribute('data-copy'), btn.getAttribute('data-label'));
+    });
+  });
+
+  listEl.querySelectorAll('.btn-emg-toggle-pass').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const card = btn.closest('.emergency-card');
+      const textSpan = card.querySelector('.emg-pass-text');
+      const isRevealed = textSpan.getAttribute('data-revealed') === 'true';
+      const actualPass = textSpan.getAttribute('data-pass');
+
+      if (isRevealed) {
+        textSpan.innerText = '••••••••••••';
+        textSpan.setAttribute('data-revealed', 'false');
+      } else {
+        textSpan.innerText = actualPass;
+        textSpan.setAttribute('data-revealed', 'true');
+      }
+    });
+  });
+}
+
+function restoreEmergencyToDevice() {
+  if (!emergencyState.data || !emergencyState.data.username) {
+    showToast('No decrypted vault to restore', 'error');
+    return;
+  }
+
+  const d = emergencyState.data;
+
+  // Persist to localStore
+  localStore.saveUser({
+    username: d.username,
+    authSalt: d.authSalt,
+    authHash: d.authHash,
+    kdfSalt: d.kdfSalt,
+    kdfIterations: d.kdfIterations || 600000,
+    encryptedVek: d.encryptedVek,
+  });
+
+  if (d.items && Array.isArray(d.items)) {
+    localStore.saveItems(d.username, d.items);
+  }
+
+  // Activate session and load state
+  state.currentUser = { id: d.username, username: d.username };
+  state.sessionToken = `session_${Date.now()}`;
+  state.mek = emergencyState.mek;
+  state.vek = emergencyState.vek;
+  state.vaultItems = emergencyState.decryptedItems;
+
+  closeModal('emergencyDecryptModal');
+  renderVaultGrid();
+  showUnlockedView();
+  showToast(`Vault successfully restored & unlocked for ${d.username}!`, 'success', 4000);
 }
 
 // =========================================================================
@@ -802,6 +1125,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Export Encrypted Backup
   document.getElementById('btnExportFile').addEventListener('click', exportEncryptedBackup);
+
+  // Email Encrypted Backup
+  document.getElementById('btnEmailBackup').addEventListener('click', emailEncryptedBackup);
+
+  // Emergency Decrypt Trigger from Login Screen
+  document.getElementById('btnOpenEmergencyDecrypt').addEventListener('click', openEmergencyDecryptModal);
+
+  // Emergency Decrypt Action
+  document.getElementById('btnRunEmergencyDecrypt').addEventListener('click', runEmergencyDecrypt);
+
+  // Emergency Filter Search
+  document.getElementById('emergencySearchInput').addEventListener('input', (e) => {
+    emergencyState.searchQuery = e.target.value;
+    renderEmergencyItems();
+  });
+
+  // Emergency Restore to Device
+  document.getElementById('btnRestoreToDevice').addEventListener('click', restoreEmergencyToDevice);
 
   // Import Backup Trigger
   const importInput = document.getElementById('importFileInput');

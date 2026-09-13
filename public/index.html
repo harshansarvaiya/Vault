@@ -99,6 +99,12 @@
             First time? Create new secure vault &rarr;
           </button>
         </div>
+
+        <div class="auth-divider" style="margin-top: 10px;">DISASTER RECOVERY</div>
+
+        <button id="btnOpenEmergencyDecrypt" class="btn" style="border-color: rgba(0, 240, 255, 0.4); color: var(--cyan-core); font-size: 12px;">
+          🔓 Emergency Decrypt from .vault File
+        </button>
       </div>
     </section>
 
@@ -253,11 +259,16 @@
         <div class="backup-action-card">
           <div>
             <div class="action-heading">1. Export Encrypted Vault Backup (.vault file)</div>
-            <div class="action-desc">Downloads your full vault as an encrypted file. Because it is protected with AES-256-GCM, you can safely keep it on Google Drive, iCloud, USB, or email it to yourself.</div>
+            <div class="action-desc">Downloads your full vault as an encrypted file. Protected with AES-256-GCM. Safely store it on Google Drive, iCloud, USB, or your files.</div>
           </div>
-          <button id="btnExportFile" class="btn btn-primary" style="margin-top: 8px;">
-            📥 Download Encrypted Backup
-          </button>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;">
+            <button id="btnExportFile" class="btn btn-primary">
+              📥 Download Backup
+            </button>
+            <button id="btnEmailBackup" class="btn" style="border-color: var(--cyan-core); color: var(--cyan-core);">
+              📧 Email Backup to Myself
+            </button>
+          </div>
         </div>
 
         <div class="backup-action-card">
@@ -284,6 +295,67 @@
 
       <div class="modal-footer">
         <button type="button" class="btn close-modal">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: EMERGENCY .VAULT FILE DECRYPTOR                   -->
+  <!-- ======================================================== -->
+  <div id="emergencyDecryptModal" class="modal-backdrop">
+    <div class="modal-card" style="max-width: 580px;">
+      <div class="modal-header">
+        <div class="modal-title">EMERGENCY .VAULT DECRYPTOR</div>
+        <button class="btn btn-icon close-modal" style="border: none; background: transparent;">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="backup-card">
+          <h4>🔓 Immediate Disaster Recovery</h4>
+          <p>Provide your encrypted <code>.vault</code> file (e.g. from your email or drive) and your Master Password. Everything is decrypted securely 100% in your browser memory.</p>
+        </div>
+
+        <!-- Step 1: File & Password Input -->
+        <div id="emergencyInputSection" style="display: flex; flex-direction: column; gap: 12px;">
+          <div class="form-group">
+            <label class="form-label">1. Select Encrypted .vault File</label>
+            <input type="file" id="emergencyVaultFileInput" accept=".vault,.json" class="form-input">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="emergencyMasterPassword">2. Master Password</label>
+            <input type="password" id="emergencyMasterPassword" class="form-input" placeholder="Enter the password used to encrypt this vault">
+          </div>
+
+          <button id="btnRunEmergencyDecrypt" class="btn btn-primary" style="height: 42px; margin-top: 4px;">
+            🔓 Decrypt & Reveal Credentials
+          </button>
+        </div>
+
+        <!-- Step 2: Decrypted Results View -->
+        <div id="emergencyOutputSection" style="display: none; flex-direction: column; gap: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-family: var(--font-mono); font-size: 13px; color: var(--green-verified); font-weight: 700;" id="emergencyDecryptedTitle">
+              ✓ Vault Decrypted Successfully
+            </div>
+            <button id="btnRestoreToDevice" class="btn btn-primary" style="font-size: 11px; padding: 6px 12px;">
+              📥 Restore to this Device
+            </button>
+          </div>
+
+          <div class="search-box" style="margin-bottom: 4px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <input type="text" id="emergencySearchInput" class="search-input" placeholder="Filter decrypted accounts...">
+          </div>
+
+          <div id="emergencyResultsList" style="display: flex; flex-direction: column; gap: 10px; max-height: 360px; overflow-y: auto;">
+            <!-- Rendered decrypted items -->
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn close-modal">Close</button>
       </div>
     </div>
   </div>
