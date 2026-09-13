@@ -94,17 +94,20 @@ body {
 
 /* Header */
 .app-header {
-  height: 60px;
+  min-height: calc(56px + var(--safe-top));
+  height: auto;
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border-dim);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px;
+  padding-top: max(var(--safe-top), 10px);
+  padding-bottom: 10px;
+  padding-left: max(16px, env(safe-area-inset-left));
+  padding-right: max(16px, env(safe-area-inset-right));
   position: sticky;
   top: 0;
   z-index: 100;
-  padding-top: var(--safe-top);
 }
 
 .brand-section {
@@ -202,6 +205,14 @@ body {
   width: 36px;
   height: 36px;
   padding: 0;
+}
+
+.btn-text-desktop {
+  display: inline;
+}
+
+.btn-text-mobile {
+  display: none;
 }
 
 .text-link {
@@ -761,9 +772,111 @@ body {
 }
 
 @media (max-width: 600px) {
+  /* Header Adjustments for Phone Screens */
+  .app-header {
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+  }
+
+  .brand-section {
+    gap: 8px;
+  }
+
+  .brand-icon {
+    width: 24px;
+    height: 24px;
+  }
+
+  .brand-title {
+    font-size: 15px;
+    letter-spacing: 0.5px;
+  }
+
+  /* Compact glowing dot for encryption status on mobile */
+  .status-badge {
+    padding: 3px;
+    min-width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    justify-content: center;
+  }
+
+  .status-badge #statusText {
+    display: none;
+  }
+
+  /* Header action buttons */
+  #unlockedHeaderActions {
+    gap: 6px !important;
+  }
+
+  #btnBackup {
+    padding: 0;
+    width: 36px;
+    height: 36px;
+    min-height: 36px;
+    border-radius: var(--radius-sm);
+  }
+
+  #btnBackup .btn-text {
+    display: none;
+  }
+
+  #btnNewItem {
+    padding: 0 10px;
+    height: 36px;
+    min-height: 36px;
+    font-size: 11px;
+    border-radius: var(--radius-sm);
+  }
+
+  .btn-text-desktop {
+    display: none;
+  }
+
+  .btn-text-mobile {
+    display: inline;
+  }
+
+  #btnLockVault {
+    width: 36px;
+    height: 36px;
+    min-height: 36px;
+  }
+
+  /* Main Container & Topbar */
+  .app-container {
+    padding: 12px;
+  }
+
+  .vault-topbar {
+    gap: 8px;
+  }
+
+  .search-box {
+    min-width: 0;
+    flex: 1;
+    height: 38px;
+    padding: 0 10px;
+  }
+
+  .search-input {
+    font-size: 13px;
+  }
+
+  .vault-stats {
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
   .vault-grid {
     grid-template-columns: 1fr;
   }
+
+  .modal-card {
+    max-height: calc(100vh - 32px - var(--safe-top) - var(--safe-bottom));
+  }
+
   #toastContainer {
     left: 16px;
     right: 16px;
