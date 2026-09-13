@@ -1,6 +1,6 @@
-# 🛡️ AegisVault // Military-Grade Zero-Knowledge Defense Vault
+# ⚡ KŪṬA-X (कूट·X) // Ancient Cipher • Quantum Matrix
 
-**AegisVault** is an enterprise-grade, end-to-end encrypted (E2EE) identity and credential defense vault built with a **Zero-Knowledge Architecture**, futuristic authentication (FIDO2 / WebAuthn Biometrics, Passkeys, Duress Coercion Decoy), full CRUD operations, and universal cross-platform accessibility for smartphones and desktop browsers.
+**KŪṬA-X** (*Kūṭa* [कूट]: Sanskrit for sacred cipher & unbreakable code) is a zero-knowledge, end-to-end encrypted (E2EE) identity and password matrix fusing **ancient Vedic cryptographic philosophy** with **far-future sci-fi tech**. Featuring **1-Touch Drishti Glance (Face ID / WebAuthn Biometrics)**, **Quantum QR Device Handshake ("Scan to Unlock")**, **Duress Coercion Decoy**, and immediate **Disaster & Theft Recovery**.
 
 ---
 

@@ -64,7 +64,7 @@ export async function registerDeviceBiometrics(user, vekKey, sessionToken = null
     publicKey: {
       challenge,
       rp: {
-        name: 'AegisVault',
+        name: 'KŪṬA-X',
         id: hostname,
       },
       user: {

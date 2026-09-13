@@ -673,8 +673,8 @@ function buildBackupPackage() {
   const user = localStore.getUser(state.currentUser.username);
 
   return {
-    format: 'aegis-encrypted-vault',
-    version: '1.0',
+    format: 'kuta-encrypted-vault',
+    version: '2.0',
     username: state.currentUser.username,
     kdfSalt: user ? user.kdfSalt : null,
     kdfIterations: user ? (user.kdfIterations || 600000) : 600000,
@@ -697,10 +697,10 @@ function exportEncryptedBackup() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `AegisVault_Backup_${state.currentUser.username}_${Date.now()}.vault`;
+  a.download = `KutaX_Backup_${state.currentUser.username}_${Date.now()}.vault`;
   a.click();
   URL.revokeObjectURL(url);
-  showToast('Encrypted backup downloaded.', 'success');
+  showToast('KŪṬA-X encrypted backup downloaded.', 'success');
 }
 
 async function emailEncryptedBackup() {
@@ -710,7 +710,7 @@ async function emailEncryptedBackup() {
     return;
   }
 
-  const filename = `AegisVault_Backup_${state.currentUser.username}_${Date.now()}.vault`;
+  const filename = `KutaX_Backup_${state.currentUser.username}_${Date.now()}.vault`;
   const jsonStr = JSON.stringify(backupPackage, null, 2);
   const blob = new Blob([jsonStr], { type: 'application/json' });
   const file = new File([blob], filename, { type: 'application/json' });
@@ -719,8 +719,8 @@ async function emailEncryptedBackup() {
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
     try {
       await navigator.share({
-        title: `Vault Encrypted Backup - ${state.currentUser.username}`,
-        text: `Encrypted Aegis Vault Backup (${filename}). Protected with zero-knowledge AES-256-GCM. Decrypt using your Master Password.`,
+        title: `KŪṬA-X Encrypted Backup - ${state.currentUser.username}`,
+        text: `Encrypted KŪṬA-X Vault Backup (${filename}). Protected with zero-knowledge AES-256-GCM. Decrypt using your Master Password.`,
         files: [file],
       });
       showToast('Backup shared successfully!', 'success');
@@ -739,9 +739,9 @@ async function emailEncryptedBackup() {
   a.click();
   URL.revokeObjectURL(url);
 
-  const subject = encodeURIComponent(`Aegis Vault Encrypted Backup - ${state.currentUser.username}`);
+  const subject = encodeURIComponent(`KŪṬA-X Encrypted Backup - ${state.currentUser.username}`);
   const body = encodeURIComponent(
-    `Hello,\n\nYour encrypted Aegis Vault backup file ("${filename}") has been saved to your downloads.\n\nPlease attach that .vault file to this email to safely keep a copy in your inbox for disaster recovery.\n\nSECURITY NOTE:\nThis file is encrypted with zero-knowledge military-grade AES-256-GCM. No one (not even email providers or attackers) can open it without your Master Password.\n\nTo restore on any phone or computer, open Aegis Vault and use the Emergency .vault Decryptor.`
+    `Hello,\n\nYour encrypted KŪṬA-X backup file ("${filename}") has been saved to your downloads.\n\nPlease attach that .vault file to this email to safely keep a copy in your inbox for disaster recovery.\n\nSECURITY NOTE:\nThis file is encrypted with zero-knowledge AES-256-GCM. No one can open it without your Master Password.\n\nTo restore on any phone or computer, open KŪṬA-X and use the Emergency .vault Decryptor.`
   );
 
   window.location.href = `mailto:?subject=${subject}&body=${body}`;
@@ -753,7 +753,7 @@ function importBackupFile(file) {
   reader.onload = async (e) => {
     try {
       const data = JSON.parse(e.target.result);
-      if (data.format !== 'aegis-encrypted-vault' || !data.username) {
+      if ((data.format !== 'kuta-encrypted-vault' && data.format !== 'aegis-encrypted-vault') || !data.username) {
         throw new Error('Invalid vault backup format');
       }
 
@@ -845,8 +845,8 @@ async function runEmergencyDecrypt() {
       throw new Error('Corrupted file: Not valid JSON');
     }
 
-    if (data.format !== 'aegis-encrypted-vault' || !data.encryptedVek || !data.kdfSalt) {
-      throw new Error('Unrecognized backup format. Expected Aegis .vault file.');
+    if ((data.format !== 'kuta-encrypted-vault' && data.format !== 'aegis-encrypted-vault') || !data.encryptedVek || !data.kdfSalt) {
+      throw new Error('Unrecognized backup format. Expected KŪṬA-X .vault file.');
     }
 
     // Derive Master Keys using the salt & iterations embedded in the backup

@@ -1,17 +1,24 @@
-/* AegisVault Streamlined Defense Design System */
+/* KŪṬA-X Ancient Sci-Fi Defense Design System */
 :root {
-  --bg-primary: #070a0e;
-  --bg-secondary: #0c121b;
-  --bg-surface: #121a26;
-  --bg-surface-hover: #182334;
-  --bg-elevated: #1e2c40;
+  --bg-primary: #05080f;
+  --bg-secondary: #090e18;
+  --bg-surface: #0f1726;
+  --bg-surface-hover: #152033;
+  --bg-elevated: #1a273e;
   
-  --border-dim: #172436;
-  --border-bright: #253954;
-  --border-focus: #00f0ff;
+  --border-dim: #152233;
+  --border-bright: #253952;
+  --border-focus: #f59e0b;
   
+  /* Ancient Solar Gold / Celestial Relic */
+  --gold-relic: #f59e0b;
+  --gold-bright: #ffd56b;
+  --gold-glow: rgba(245, 158, 11, 0.28);
+  --gold-dim: rgba(245, 158, 11, 0.08);
+
+  /* Quantum Vimana Plasma Cyan */
   --cyan-core: #00f0ff;
-  --cyan-glow: rgba(0, 240, 255, 0.25);
+  --cyan-glow: rgba(0, 240, 255, 0.28);
   --cyan-dim: rgba(0, 240, 255, 0.08);
   
   --green-verified: #00ff88;
@@ -45,6 +52,12 @@
 
 body {
   background-color: var(--bg-primary);
+  background-image: 
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(245, 158, 11, 0.08), transparent),
+    radial-gradient(ellipse 60% 40% at 50% 120%, rgba(0, 240, 255, 0.05), transparent),
+    linear-gradient(rgba(245, 158, 11, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(245, 158, 11, 0.02) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 36px 36px, 36px 36px;
   color: var(--text-primary);
   font-family: var(--font-sans);
   min-height: 100vh;
@@ -123,14 +136,31 @@ body {
 
 .brand-title {
   font-family: var(--font-mono);
-  font-weight: 700;
+  font-weight: 800;
   font-size: 16px;
-  letter-spacing: 1px;
+  letter-spacing: 1.5px;
   color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 3px;
 }
 
-.brand-title span {
+.brand-devanagari {
+  color: var(--gold-relic);
+  text-shadow: 0 0 10px var(--gold-glow);
+  font-weight: 700;
+  font-size: 15px;
+  margin-right: 2px;
+}
+
+.brand-latin {
+  color: #ffffff;
+}
+
+.brand-x {
   color: var(--cyan-core);
+  text-shadow: 0 0 10px var(--cyan-glow);
+  font-weight: 900;
 }
 
 .status-badge {
@@ -252,13 +282,25 @@ body {
   background: var(--bg-secondary);
   border: 1px solid var(--border-bright);
   border-radius: var(--radius-lg);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), 0 0 24px rgba(245, 158, 11, 0.06);
   width: 100%;
   max-width: 400px;
   padding: 28px 20px;
   display: flex;
   flex-direction: column;
   gap: 16px;
+  position: relative;
+  overflow: hidden;
+}
+
+.auth-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 15%;
+  right: 15%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--gold-relic), var(--cyan-core), transparent);
 }
 
 .auth-header {
@@ -270,16 +312,17 @@ body {
 }
 
 .auth-shield-logo {
-  width: 50px;
-  height: 50px;
+  width: 54px;
+  height: 54px;
   margin-bottom: 4px;
+  filter: drop-shadow(0 0 16px var(--gold-glow));
 }
 
 .auth-header h2 {
   font-family: var(--font-mono);
   font-size: 17px;
   color: #fff;
-  letter-spacing: 1px;
+  letter-spacing: 1.5px;
 }
 
 .auth-header p {
@@ -288,8 +331,8 @@ body {
 }
 
 .passkey-hero-btn {
-  background: rgba(0, 240, 255, 0.08);
-  border: 1px solid var(--cyan-core);
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(0, 240, 255, 0.08));
+  border: 1px solid var(--gold-relic);
   color: #fff;
   padding: 12px;
   border-radius: var(--radius-md);
@@ -302,11 +345,13 @@ body {
   gap: 10px;
   cursor: pointer;
   transition: all 0.2s ease;
+  box-shadow: 0 0 14px rgba(245, 158, 11, 0.15);
 }
 
 .passkey-hero-btn:hover {
-  background: rgba(0, 240, 255, 0.16);
-  box-shadow: 0 0 16px var(--cyan-glow);
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.22), rgba(0, 240, 255, 0.16));
+  box-shadow: 0 0 22px var(--gold-glow);
+  border-color: var(--gold-bright);
 }
 
 .auth-divider {
