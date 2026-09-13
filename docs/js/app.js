@@ -247,41 +247,37 @@ async function handleLogin(username, password) {
 
 async function handlePasskeyLogin() {
   try {
-    showToast('Engaging biometric sensor...', 'info');
-    const result = await authenticatePasskey();
+    const enteredUsername = document.getElementById('loginUsername').value.trim();
+    const username = enteredUsername || localStorage.getItem('aegis_active_bio_user');
+
+    if (!username) {
+      showToast('Enter your Account Identifier first, or register biometrics after logging in.', 'info', 4000);
+      return;
+    }
+
+    const bioDataStr = localStorage.getItem(`aegis_bio_${username.toLowerCase()}`);
+    if (!bioDataStr) {
+      showToast('Face ID not enrolled on this device yet. Log in with your Master Password first, then tap "Register This Device\'s Biometrics" in Backup settings.', 'info', 6000);
+      return;
+    }
+
+    showToast('Engaging Face ID / Biometric sensor...', 'info', 2000);
+    const result = await authenticatePasskey(username);
     if (!result || !result.success) throw new Error('Biometric verification failed');
 
     state.currentUser = result.user;
     state.sessionToken = result.sessionToken;
-
-    const masterPass = prompt('Biometric verified! Enter Master Password to decrypt vault data:');
-    if (!masterPass) {
-      showToast('Master password required for zero-knowledge decryption', 'error');
-      return;
-    }
-
-    let salts = null;
-    try {
-      if (!isStaticHosting) {
-        const preRes = await fetch(`./api/auth/pre-login?username=${encodeURIComponent(result.user.username)}`);
-        if (preRes.ok) salts = await preRes.json();
-      }
-    } catch {}
-
-    if (!salts) {
-      const lu = localStore.getUser(result.user.username);
-      if (lu) salts = lu;
-    }
-
-    const { mek } = await deriveMasterKeys(masterPass, salts.kdfSalt, salts.kdfIterations);
-    state.mek = mek;
-    state.vek = await decryptVek(result.encryptedVek, mek);
+    state.vek = result.vek;
 
     await loadVaultItems();
     showUnlockedView();
-    showToast('Biometric unlock successful.', 'success');
+    showToast('Vault unlocked with Face ID!', 'success');
   } catch (err) {
-    showToast(err.message, 'error');
+    if (err.name === 'NotAllowedError' || err.message?.includes('cancelled')) {
+      showToast('Biometric scan cancelled.', 'info');
+    } else {
+      showToast(err.message || 'Biometric authentication failed', 'error');
+    }
   }
 }
 
@@ -1156,11 +1152,19 @@ document.addEventListener('DOMContentLoaded', () => {
   // Register Passkey
   document.getElementById('btnRegisterPasskey').addEventListener('click', async () => {
     try {
-      showToast('Enrolling device biometrics...', 'info');
-      await registerPasskey(state.sessionToken, 'Personal Device');
-      showToast('Biometric passkey registered successfully!', 'success');
+      if (!state.currentUser || !state.vek) {
+        showToast('Please open and unlock your vault first to enroll Face ID', 'error');
+        return;
+      }
+      showToast('Enrolling device biometrics (Face ID / Touch ID)...', 'info');
+      await registerPasskey(state.currentUser, state.vek, state.sessionToken);
+      showToast('Face ID / Biometrics successfully enrolled on this device!', 'success', 4000);
     } catch (err) {
-      showToast(err.message, 'error');
+      if (err.name === 'NotAllowedError' || err.message?.includes('cancelled')) {
+        showToast('Biometric enrollment cancelled.', 'info');
+      } else {
+        showToast(err.message || 'Failed to register biometrics', 'error');
+      }
     }
   });
 });
