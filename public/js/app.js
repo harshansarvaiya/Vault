@@ -10,6 +10,8 @@ import {
 } from './crypto.js';
 
 import { isWebAuthnSupported, registerPasskey, authenticatePasskey } from './webauthn-client.js';
+import { createPairingSession, authorizePairingRequest } from './device-pairing.js';
+import { createQrSvg } from './qr-codec.js';
 
 // Application State
 const isStaticHosting = window.location.hostname.endsWith('github.io') || window.location.protocol === 'file:';
@@ -95,7 +97,11 @@ function closeModal(modalId) {
 document.querySelectorAll('.close-modal').forEach((btn) => {
   btn.addEventListener('click', (e) => {
     const modal = e.target.closest('.modal-backdrop');
-    if (modal) modal.classList.remove('active');
+    if (modal) {
+      modal.classList.remove('active');
+      if (modal.id === 'qrPairingModal' && typeof cancelQrPairing === 'function') cancelQrPairing();
+      if (modal.id === 'scannerModal' && typeof stopCameraScanner === 'function') stopCameraScanner();
+    }
   });
 });
 
@@ -1039,6 +1045,282 @@ function restoreEmergencyToDevice() {
 }
 
 // =========================================================================
+// CROSS-DEVICE QR PAIRING & HANDSHAKE (WhatsApp-Style Scan to Unlock)
+// =========================================================================
+
+let activePairingSession = null;
+let pendingPairingRequest = null;
+let scannerMediaStream = null;
+let scannerScanLoop = null;
+
+async function startQrPairing() {
+  const qrContainer = document.getElementById('qrCodeContainer');
+  const statusText = document.getElementById('qrStatusText');
+  if (!qrContainer || !statusText) return;
+
+  qrContainer.innerHTML = '<div style="color: #000; font-size: 13px; font-family: monospace; text-align: center;">Generating keys...</div>';
+  statusText.innerText = 'Creating encrypted session...';
+
+  // Cancel previous session if any
+  if (activePairingSession) {
+    activePairingSession.cancel();
+    activePairingSession = null;
+  }
+
+  openModal('qrPairingModal');
+
+  try {
+    activePairingSession = await createPairingSession((status) => {
+      statusText.innerText = status;
+    });
+
+    // Render pure-JS QR code SVG
+    const svgCode = createQrSvg(activePairingSession.pairingUrl, 200);
+    qrContainer.innerHTML = svgCode;
+    statusText.innerText = 'Scan with your iPhone camera...';
+
+    // Await phone Face ID authorization & encrypted vault transmission
+    const result = await activePairingSession.promise;
+
+    statusText.innerText = '✓ Decrypted! Opening vault...';
+
+    // 1. Save user to localStore
+    localStore.saveUser({
+      username: result.username,
+      authSalt: result.authSalt,
+      authHash: result.authHash,
+      kdfSalt: result.kdfSalt,
+      kdfIterations: result.kdfIterations || 600000,
+      encryptedVek: result.encryptedVek,
+    });
+
+    // 2. Save items to localStore
+    if (result.items && Array.isArray(result.items)) {
+      localStore.saveItems(result.username, result.items);
+    }
+
+    // 3. Set application state
+    state.currentUser = { id: result.username, username: result.username };
+    state.sessionToken = `session_${Date.now()}`;
+    state.vek = result.vek;
+
+    // 4. Load vault items & unlock UI
+    await loadVaultItems();
+    closeModal('qrPairingModal');
+    showUnlockedView();
+
+    showToast(`✓ Computer successfully unlocked for ${result.username}!`, 'success', 5000);
+    activePairingSession = null;
+  } catch (err) {
+    if (err.message && !err.message.includes('cancelled')) {
+      showToast(err.message, 'error', 5000);
+      if (statusText) statusText.innerText = 'Pairing session cancelled or timed out.';
+    }
+  }
+}
+
+function cancelQrPairing() {
+  if (activePairingSession) {
+    activePairingSession.cancel();
+    activePairingSession = null;
+  }
+  closeModal('qrPairingModal');
+}
+
+function getStoredAccountUsername() {
+  if (state.currentUser?.username) return state.currentUser.username;
+  const bioUser = localStorage.getItem('aegis_active_bio_user');
+  if (bioUser) return bioUser;
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith('aegis_bio_')) {
+      return key.replace('aegis_bio_', '');
+    }
+  }
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith('aegis_user_')) {
+      return key.replace('aegis_user_', '');
+    }
+  }
+  return null;
+}
+
+function triggerPhoneAuthorization() {
+  if (!pendingPairingRequest) return;
+
+  const username = getStoredAccountUsername();
+  if (!username) {
+    showToast('No vault found on this device to authorize from. Please create or log into your vault first.', 'error', 5000);
+    return;
+  }
+
+  const hasBiometrics = !!localStorage.getItem(`aegis_bio_${username.toLowerCase()}`);
+  const btn = document.getElementById('btnConfirmPhoneAuth');
+  if (btn) {
+    if (state.vek) {
+      btn.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 13l4 4L19 7"/></svg><span>Authorize Computer (${username})</span>`;
+    } else if (hasBiometrics) {
+      btn.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2h-1V7a5 5 0 0 0-5-5zm-3 8V7a3 3 0 0 1 6 0v3H9z"/></svg><span>Authorize with Face ID (${username})</span>`;
+    } else {
+      btn.innerHTML = `<span>Authorize Computer (${username})</span>`;
+    }
+  }
+
+  openModal('phoneAuthModal');
+}
+
+async function handleConfirmPhoneAuth() {
+  if (!pendingPairingRequest) return;
+
+  const username = getStoredAccountUsername();
+  if (!username) {
+    showToast('No vault account found on this device', 'error');
+    return;
+  }
+
+  try {
+    let vek = state.vek;
+
+    // If vault is locked on phone, verify Face ID first
+    if (!vek) {
+      const hasBiometrics = !!localStorage.getItem(`aegis_bio_${username.toLowerCase()}`);
+      if (hasBiometrics) {
+        showToast('Engaging Face ID to authorize device...', 'info', 2000);
+        const bioResult = await authenticatePasskey(username);
+        if (!bioResult || !bioResult.vek) throw new Error('Biometric verification failed');
+        vek = bioResult.vek;
+        state.currentUser = bioResult.user;
+        state.sessionToken = bioResult.sessionToken;
+        state.vek = bioResult.vek;
+        await loadVaultItems();
+        showUnlockedView();
+      } else {
+        showToast('Please open and unlock your vault on this phone first.', 'info', 4000);
+        closeModal('phoneAuthModal');
+        return;
+      }
+    }
+
+    showToast('Authorizing computer & transmitting encrypted keys...', 'info', 3000);
+
+    await authorizePairingRequest(
+      pendingPairingRequest.sessionId,
+      pendingPairingRequest.targetPubKeyBase64,
+      username,
+      vek,
+      localStore
+    );
+
+    closeModal('phoneAuthModal');
+    pendingPairingRequest = null;
+    showToast('✓ Computer authorized! Your vault is now open on your computer.', 'success', 5000);
+  } catch (err) {
+    if (err.name === 'NotAllowedError' || err.message?.includes('cancelled')) {
+      showToast('Face ID authorization cancelled.', 'info');
+    } else {
+      showToast(err.message || 'Failed to authorize computer', 'error');
+    }
+  }
+}
+
+function checkIncomingPairingParam() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const pairSessionId = urlParams.get('pair');
+  const targetPubKeyBase64 = window.location.hash.replace(/^#/, '');
+
+  if (pairSessionId && targetPubKeyBase64) {
+    // Clear URL query & hash cleanly without reloading
+    window.history.replaceState({}, document.title, window.location.pathname);
+
+    pendingPairingRequest = {
+      sessionId: pairSessionId,
+      targetPubKeyBase64: targetPubKeyBase64,
+    };
+
+    triggerPhoneAuthorization();
+  }
+}
+
+async function startCameraScanner() {
+  const video = document.getElementById('scannerVideo');
+  const statusText = document.getElementById('scannerStatusText');
+  closeModal('backupModal');
+  openModal('scannerModal');
+
+  try {
+    statusText.innerText = 'Requesting camera access...';
+    scannerMediaStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' } },
+    });
+    video.srcObject = scannerMediaStream;
+    await video.play();
+    statusText.innerText = 'Point camera at computer screen QR code...';
+
+    if ('BarcodeDetector' in window) {
+      const detector = new window.BarcodeDetector({ formats: ['qr_code'] });
+
+      const scanStep = async () => {
+        if (!scannerMediaStream) return;
+        try {
+          if (video.readyState === video.HAVE_ENOUGH_DATA) {
+            const barcodes = await detector.detect(video);
+            if (barcodes.length > 0) {
+              const scannedRaw = barcodes[0].rawValue;
+              if (scannedRaw && scannedRaw.includes('pair=')) {
+                stopCameraScanner();
+                handleScannedPairUrl(scannedRaw);
+                return;
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('Barcode detector frame error:', e);
+        }
+        scannerScanLoop = requestAnimationFrame(scanStep);
+      };
+      scannerScanLoop = requestAnimationFrame(scanStep);
+    } else {
+      statusText.innerText = 'Tip: Point your native iPhone Camera app at the computer screen directly!';
+    }
+  } catch (err) {
+    statusText.innerText = 'Camera access unavailable or denied.';
+    showToast('Camera permission denied. You can point your native iPhone Camera app at the computer screen instead!', 'info', 6000);
+  }
+}
+
+function stopCameraScanner() {
+  if (scannerScanLoop) {
+    cancelAnimationFrame(scannerScanLoop);
+    scannerScanLoop = null;
+  }
+  if (scannerMediaStream) {
+    scannerMediaStream.getTracks().forEach((track) => track.stop());
+    scannerMediaStream = null;
+  }
+  const video = document.getElementById('scannerVideo');
+  if (video) video.srcObject = null;
+  closeModal('scannerModal');
+}
+
+function handleScannedPairUrl(rawUrl) {
+  try {
+    const url = new URL(rawUrl);
+    const sessionId = url.searchParams.get('pair');
+    const targetPubKeyBase64 = url.hash.replace(/^#/, '');
+
+    if (sessionId && targetPubKeyBase64) {
+      pendingPairingRequest = { sessionId, targetPubKeyBase64 };
+      triggerPhoneAuthorization();
+    } else {
+      showToast('QR code is not a valid Aegis pairing code', 'error');
+    }
+  } catch {
+    showToast('Invalid QR code format', 'error');
+  }
+}
+
+// =========================================================================
 // INITIALIZATION
 // =========================================================================
 
@@ -1167,4 +1449,31 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
   });
+
+  // Target Device: QR Code Pairing
+  const btnOpenQr = document.getElementById('btnOpenQrPairing');
+  if (btnOpenQr) btnOpenQr.addEventListener('click', startQrPairing);
+
+  const btnCancelQr = document.getElementById('btnCancelQrPairing');
+  if (btnCancelQr) btnCancelQr.addEventListener('click', cancelQrPairing);
+
+  const btnCloseQr = document.getElementById('btnCloseQrPairing');
+  if (btnCloseQr) btnCloseQr.addEventListener('click', cancelQrPairing);
+
+  // Phone Device: Confirm Face ID Authorization
+  const btnConfirmPhone = document.getElementById('btnConfirmPhoneAuth');
+  if (btnConfirmPhone) btnConfirmPhone.addEventListener('click', handleConfirmPhoneAuth);
+
+  // In-App Camera Scanner
+  const btnOpenScan = document.getElementById('btnOpenScanner');
+  if (btnOpenScan) btnOpenScan.addEventListener('click', startCameraScanner);
+
+  const btnCancelScan = document.getElementById('btnCancelScanner');
+  if (btnCancelScan) btnCancelScan.addEventListener('click', stopCameraScanner);
+
+  const btnCloseScan = document.getElementById('btnCloseScanner');
+  if (btnCloseScan) btnCloseScan.addEventListener('click', stopCameraScanner);
+
+  // Check if page opened via scanned QR code (?pair=...#...)
+  checkIncomingPairingParam();
 });

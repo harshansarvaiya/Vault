@@ -73,6 +73,12 @@
           <span>Unlock with Biometrics (Face ID / Fingerprint)</span>
         </button>
 
+        <!-- QR Code Cross-Device Unlock (WhatsApp-Style) -->
+        <button id="btnOpenQrPairing" class="btn" style="border-color: rgba(0, 240, 255, 0.4); color: var(--cyan-core); font-size: 13px; padding: 11px; display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+          <span>Unlock via Phone QR (Scan to Login)</span>
+        </button>
+
         <div class="auth-divider">OR MASTER PASSWORD</div>
 
         <!-- Login Form -->
@@ -292,6 +298,16 @@
             ⚡ Register This Device's Biometrics
           </button>
         </div>
+
+        <div class="backup-action-card">
+          <div>
+            <div class="action-heading">4. Authorize New Device (Laptop / Computer)</div>
+            <div class="action-desc">Scan a QR code on your computer or tablet to instantly log in with Face ID without typing your Master Password.</div>
+          </div>
+          <button id="btnOpenScanner" class="btn btn-primary" style="margin-top: 8px;">
+            📲 Scan QR to Unlock Computer
+          </button>
+        </div>
       </div>
 
       <div class="modal-footer">
@@ -357,6 +373,106 @@
 
       <div class="modal-footer">
         <button type="button" class="btn close-modal">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: QR CODE PAIRING (Laptop / Target Device)         -->
+  <!-- ======================================================== -->
+  <div id="qrPairingModal" class="modal-backdrop">
+    <div class="modal-card" style="max-width: 440px; text-align: center;">
+      <div class="modal-header">
+        <div class="modal-title">UNLOCK VIA PHONE QR</div>
+        <button class="btn btn-icon close-modal" id="btnCloseQrPairing" style="border: none; background: transparent;">&times;</button>
+      </div>
+
+      <div class="modal-body" style="align-items: center; gap: 14px;">
+        <p style="font-size: 13px; color: var(--text-secondary); max-width: 320px;">
+          Point your iPhone camera at this QR code to unlock this screen instantly with Face ID.
+        </p>
+
+        <!-- QR Display Area -->
+        <div id="qrCodeContainer" style="width: 220px; height: 220px; background: #fff; padding: 10px; border-radius: var(--radius-md); box-shadow: 0 0 24px rgba(0, 240, 255, 0.25); display: flex; align-items: center; justify-content: center;">
+          <!-- SVG injected here -->
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 12px; color: var(--cyan-core);" id="qrPairingStatus">
+          <span class="status-dot"></span>
+          <span id="qrStatusText">Waiting for phone scan...</span>
+        </div>
+
+        <div style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">
+          End-to-End Encrypted (ECDH P-256 + AES-256-GCM)
+        </div>
+      </div>
+
+      <div class="modal-footer" style="justify-content: center;">
+        <button type="button" class="btn close-modal" id="btnCancelQrPairing">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: PHONE AUTHORIZE PROMPT                            -->
+  <!-- ======================================================== -->
+  <div id="phoneAuthModal" class="modal-backdrop">
+    <div class="modal-card" style="max-width: 400px; text-align: center;">
+      <div class="modal-header">
+        <div class="modal-title">AUTHORIZE NEW DEVICE</div>
+        <button class="btn btn-icon close-modal" style="border: none; background: transparent;">&times;</button>
+      </div>
+
+      <div class="modal-body" style="align-items: center; gap: 14px;">
+        <div style="width: 56px; height: 56px; border-radius: 50%; background: var(--bg-surface); border: 2px solid var(--cyan-core); display: flex; align-items: center; justify-content: center; box-shadow: 0 0 16px var(--cyan-glow);">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--cyan-core)" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+        </div>
+
+        <h3 style="font-size: 16px; color: #fff; font-family: var(--font-mono);">Authorize Login on Computer?</h3>
+
+        <p style="font-size: 12px; color: var(--text-secondary); line-height: 1.5; max-width: 300px;">
+          A computer or new device is requesting access to your vault. Confirm with Face ID to transfer encryption keys securely end-to-end.
+        </p>
+
+        <button id="btnConfirmPhoneAuth" class="btn btn-primary" style="width: 100%; height: 46px; font-size: 14px; gap: 8px;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2h-1V7a5 5 0 0 0-5-5zm-3 8V7a3 3 0 0 1 6 0v3H9z"></path></svg>
+          <span>Authorize with Face ID</span>
+        </button>
+      </div>
+
+      <div class="modal-footer" style="justify-content: center;">
+        <button type="button" class="btn close-modal">Reject & Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: CAMERA QR SCANNER (In-App on Phone)              -->
+  <!-- ======================================================== -->
+  <div id="scannerModal" class="modal-backdrop">
+    <div class="modal-card" style="max-width: 440px; text-align: center;">
+      <div class="modal-header">
+        <div class="modal-title">SCAN COMPUTER QR CODE</div>
+        <button class="btn btn-icon close-modal" id="btnCloseScanner" style="border: none; background: transparent;">&times;</button>
+      </div>
+
+      <div class="modal-body" style="align-items: center; gap: 12px;">
+        <p style="font-size: 12px; color: var(--text-secondary);">
+          Point your phone camera at the QR code on your computer screen.
+        </p>
+
+        <div style="width: 100%; max-width: 320px; height: 260px; background: #000; border-radius: var(--radius-md); overflow: hidden; position: relative; border: 2px solid var(--cyan-core); display: flex; align-items: center; justify-content: center; margin: 0 auto;">
+          <video id="scannerVideo" playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
+          <div style="position: absolute; inset: 20px; border: 2px dashed rgba(0, 240, 255, 0.6); border-radius: 8px; pointer-events: none;"></div>
+        </div>
+
+        <div id="scannerStatusText" style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">
+          Looking for pairing code...
+        </div>
+      </div>
+
+      <div class="modal-footer" style="justify-content: center;">
+        <button type="button" class="btn close-modal" id="btnCancelScanner">Close Scanner</button>
       </div>
     </div>
   </div>

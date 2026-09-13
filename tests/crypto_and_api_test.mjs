@@ -314,6 +314,130 @@ async function runTests() {
     assert.strictEqual(recoveredItems[1].password, 'BankingPassword#7788');
   });
 
+  // TEST 10: ECDH Cross-Device Handshake & Zero-Knowledge Vault Transfer
+  await test('ECDH Cross-Device Handshake & E2E Encrypted Vault Transfer', async () => {
+    // 1. Target device (e.g. Laptop) generates ephemeral ECDH P-256 keypair
+    const targetKeyPair = await crypto.subtle.generateKey(
+      { name: 'ECDH', namedCurve: 'P-256' },
+      true,
+      ['deriveKey', 'deriveBits']
+    );
+    const targetPubKeyRaw = await crypto.subtle.exportKey('raw', targetKeyPair.publicKey);
+
+    // 2. Primary device (e.g. iPhone) generates ephemeral ECDH P-256 keypair
+    const phoneKeyPair = await crypto.subtle.generateKey(
+      { name: 'ECDH', namedCurve: 'P-256' },
+      true,
+      ['deriveKey', 'deriveBits']
+    );
+    const phonePubKeyRaw = await crypto.subtle.exportKey('raw', phoneKeyPair.publicKey);
+
+    // 3. Both devices import each other's public key
+    const importedTargetPub = await crypto.subtle.importKey(
+      'raw',
+      targetPubKeyRaw,
+      { name: 'ECDH', namedCurve: 'P-256' },
+      false,
+      []
+    );
+    const importedPhonePub = await crypto.subtle.importKey(
+      'raw',
+      phonePubKeyRaw,
+      { name: 'ECDH', namedCurve: 'P-256' },
+      false,
+      []
+    );
+
+    // 4. Derive shared secrets (Diffie-Hellman)
+    const phoneSharedKey = await crypto.subtle.deriveKey(
+      { name: 'ECDH', public: importedTargetPub },
+      phoneKeyPair.privateKey,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt']
+    );
+
+    const targetSharedKey = await crypto.subtle.deriveKey(
+      { name: 'ECDH', public: importedPhonePub },
+      targetKeyPair.privateKey,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['decrypt']
+    );
+
+    // 5. Phone prepares vault payload with VEK and encrypted credentials
+    const { key: userVek } = await generateVek();
+    const rawVek = await crypto.subtle.exportKey('raw', userVek);
+
+    const secretCred = {
+      title: 'Secret Service Portal',
+      username: 'agent007',
+      password: 'LicenseToEncrypt!2026',
+    };
+    const encryptedItemPayload = await encryptPayload(secretCred, userVek);
+
+    const vaultPayload = {
+      username: 'agent007',
+      rawVek: Buffer.from(rawVek).toString('base64url'),
+      items: [{ id: 'cred-007', encrypted_payload: encryptedItemPayload }],
+    };
+
+    // 6. Phone encrypts payload with shared key (AES-256-GCM)
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const plaintext = new TextEncoder().encode(JSON.stringify(vaultPayload));
+    const ciphertext = await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv },
+      phoneSharedKey,
+      plaintext
+    );
+
+    // 7. Target device decrypts ciphertext with its shared key
+    const decryptedBytes = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv },
+      targetSharedKey,
+      ciphertext
+    );
+    const decryptedPayload = JSON.parse(new TextDecoder().decode(decryptedBytes));
+
+    assert.strictEqual(decryptedPayload.username, 'agent007');
+    assert.strictEqual(decryptedPayload.items.length, 1);
+
+    // 8. Target imports transmitted VEK and successfully decrypts the credential item
+    const targetVek = await crypto.subtle.importKey(
+      'raw',
+      Buffer.from(decryptedPayload.rawVek, 'base64url'),
+      { name: 'AES-GCM', length: 256 },
+      true,
+      ['decrypt']
+    );
+
+    const recoveredItem = await decryptPayload(decryptedPayload.items[0].encrypted_payload, targetVek);
+    assert.strictEqual(recoveredItem.title, 'Secret Service Portal');
+    assert.strictEqual(recoveredItem.password, 'LicenseToEncrypt!2026');
+
+    // 9. Negative test: Third party / eavesdropper without target private key CANNOT decrypt
+    const eavesdropperKey = await crypto.subtle.generateKey(
+      { name: 'ECDH', namedCurve: 'P-256' },
+      true,
+      ['deriveKey']
+    );
+    const eavesdropperShared = await crypto.subtle.deriveKey(
+      { name: 'ECDH', public: importedPhonePub },
+      eavesdropperKey.privateKey,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['decrypt']
+    );
+
+    let eavesdropThrew = false;
+    try {
+      await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, eavesdropperShared, ciphertext);
+    } catch {
+      eavesdropThrew = true;
+    }
+    assert.strictEqual(eavesdropThrew, true, 'Eavesdropper MUST fail AES-GCM AEAD decryption tag verification');
+  });
+
   console.log('\n================================================================');
   console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED`);
   console.log('================================================================\n');
